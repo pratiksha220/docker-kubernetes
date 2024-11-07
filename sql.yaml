@@ -1,0 +1,71 @@
+# File that defines endpoints for exposing Prometheus metrics for SQL result sets.
+# It talks to a [SQL Agent](https://github.com/chop-dbhi/sql-agent) service that
+# performs the query against the target database and returns the result set.
+# The `driver`, `connection`, `sql`, and `params` options defined for each endpoint
+# are passed to the service to execute the query. The other options are specific
+# to this service.
+
+# Name of the metric. Will be exposed as query_result_num_products
+- num_products:
+    # Help text seen for metrics exposed
+    help: Products belonging to category ID 5
+    # Name of the driver to use.
+    driver: postgresql
+
+    # Connection information.
+    connection:
+        host: example.org
+        port: 5432
+        user: postgres
+        password: s3cre7
+        database: products
+
+    # SQL string. Parameters are name-based (not positional) and must be
+    # prefixed with a colon. See `:category_id` in the query below for an example.
+    # Must return single row, single column
+    sql: >
+        select count(product_id)
+        from product
+            inner join product_category
+                on (product.category_id = product_category.id)
+            inner join product_category_idx
+                on (product_category.id = product_category_idx.category_id)
+        where product_category_idx.category_id = :category_id
+            or product_category_idx.ancestor_category_id = :category_id
+
+    # Parameter values by name.
+    params:
+        category_id: 5
+
+    # The time between query execution. This should be set relative to the frequency
+    # of expected updates and the required granularity of changes.
+    interval: 1h
+
+    # value on error, default is null
+    # if not null, when query has error, will use this value to indicate an error has occured
+    #value-on-error: '-1'
+
+# For faceted metrics provide the name of the metric-column in config, and return a resultset of multiple columns and rows
+- sales_by_country:
+    # Help text seen for metrics exposed
+    help: Number of sales by country
+    # Name of the driver to use.
+    driver: postgresql
+
+    # Connection information.
+    connection:
+        host: example.org
+        port: 5432
+        user: postgres
+        password: s3cre7
+        database: products
+
+    sql: >
+        select country, count(1) as cnt from sales
+
+    # The time between query execution. This should be set relative to the frequency
+    # of expected updates and the required granularity of changes.
+    interval: 1h
+
+    # The value for our metric is in "cnt", other columns are facets (exposed as labels)
+    data-field: cnt
